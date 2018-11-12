@@ -1,6 +1,6 @@
 #include <PS2X_lib.h>
 #include <Servo.h>
-#include "DFRobotDFPlayerMini.h"
+#include <CBMusic.h>
 
 //后马达 A / B
 #define MotorA_IN1 13
@@ -14,7 +14,7 @@
 #define MotorD_IN1 3
 #define MotorD_IN2 2
 
-//手柄   
+//手柄
 #define PS2_DAT        6
 #define PS2_CMD        7
 #define PS2_SEL        8
@@ -46,16 +46,21 @@ int temp_y = 128; //记录上一次的y
 //MP3播放对象
 DFRobotDFPlayerMini mp3;
 //计算时间间隔变量
-static unsigned long timer = millis();
+static unsigned long music_timer = 0;
+//判断车现在是否已经启动
+bool start_flag = false;
+//判断车现在是否在停止
+bool stop_flag = true;
 
 void setup() {
   Serial.begin(9600);
   Serial.begin(115200);
+  Serial1.begin(9600);
   barrel1.attach(22);
   barrel2.attach(23);
   barrel1.write(initialAngle);
   barrel2.write(initialAngle);
-  
+
   pinMode(MotorA_IN1, OUTPUT);
   pinMode(MotorA_IN2, OUTPUT);
   pinMode(MotorB_IN1, OUTPUT);
@@ -68,11 +73,23 @@ void setup() {
   error = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble);
   type = ps2x.readType();
 
-  mp3.volume(30);  //设置音量  0 - 30
-  mp3.play(1);  //播放第一首曲目
+  mp3.begin(Serial1);
+  mp3.volume(20);  //设置音量  0 - 30
+  mp3.disableLoop(); //取消循环
 }
 
 void loop() {
+
+  //判断汽车是否已经启动
+  if (start_flag)
+  {
+    if (millis() - music_timer >= 4500)
+    {
+      mp3.loop(2);
+      music_timer = millis();
+    }
+  }
+
   if (type != 2)
   {
     ps2x.read_gamepad(false, vibrate);
@@ -95,16 +112,16 @@ void loop() {
 
     vibrate = ps2x.Analog(PSAB_CROSS);  //this will set the large motor vibrate speed based on how hard you press the blue (X) button
 
-        Serial.print("Stick Values:");
-        Serial.print(ps2x.Analog(PSS_LX), DEC); //Left stick, Y axis. Other options: LX, RY, RX
-        Serial.print(",");
-        Serial.print(ps2x.Analog(PSS_LY), DEC);
-        Serial.print(",");
-        Serial.print(initialAngle);
-        Serial.print(",");
-        Serial.print(ps2x.Analog(PSS_RY), DEC);
-        Serial.print(",");
-        Serial.println(ps2x.Analog(PSS_RX), DEC);
+    Serial.print("Stick Values:");
+    Serial.print(ps2x.Analog(PSS_LX), DEC); //Left stick, Y axis. Other options: LX, RY, RX
+    Serial.print(",");
+    Serial.print(ps2x.Analog(PSS_LY), DEC);
+    Serial.print(",");
+    Serial.print(initialAngle);
+    Serial.print(",");
+    Serial.print(ps2x.Analog(PSS_RY), DEC);
+    Serial.print(",");
+    Serial.println(ps2x.Analog(PSS_RX), DEC);
 
     if (ps2x.Button(PSB_L3))
       Serial.println("L3 pressed");
@@ -112,7 +129,23 @@ void loop() {
       Serial.println("R3 pressed");
     if (ps2x.Button(PSB_L1))
     {
-      Serial.println("L1 pressed");
+      if (millis() - music_timer >= 2000)
+      {
+        Serial.println("L1 pressed");
+        //启动汽车:
+        if (!start_flag)
+        {
+          mp3.play(1);
+          start_flag = true; //启动，设置为true
+        }
+        else
+        {
+          mp3.pause();
+          start_flag = false; //熄火，设置为false
+          stop_flag = true;
+        }
+        music_timer = millis();
+      }
     }
     if (ps2x.Button(PSB_R1))
     {
@@ -140,12 +173,12 @@ void loop() {
       if (millis() - last_time > 3000)
       {
         current_level = current_level == 2 ? 2 : (++current_level);
-        Serial.print("减档，当前档位："); 
-        Serial.println(current_level); 
+        Serial.print("减档，当前档位：");
+        Serial.println(current_level);
         last_time = millis();
       }
       else {
-        Serial.println("时间间隔过短不可连续加档"); 
+        Serial.println("时间间隔过短不可连续加档");
       }
     }
     if (ps2x.Button(PSB_CROSS))
@@ -154,15 +187,15 @@ void loop() {
       if (millis() - last_time > 3000)
       {
         current_level = current_level == 0 ? 0 : (--current_level);
-        Serial.print("减档，当前档位："); 
-        Serial.println(current_level); 
+        Serial.print("减档，当前档位：");
+        Serial.println(current_level);
         last_time = millis();
       }
       else {
-        Serial.println("时间间隔过短不可连续减档"); 
+        Serial.println("时间间隔过短不可连续减档");
       }
     }
-    
+
     int LY = ps2x.Analog(PSS_LY);
     int LX = ps2x.Analog(PSS_LX);
     int RY = ps2x.Analog(PSS_RY);
@@ -195,6 +228,7 @@ void loop() {
 
 //前进
 void advance(int speed) {
+  stop_flag = false;
   //Motor_A
   analogWrite(MotorA_IN1, map(speed, 126, 0, 0, speed_range[current_level]));
   digitalWrite(MotorA_IN2, LOW);
@@ -209,6 +243,7 @@ void advance(int speed) {
 
 //后退
 void retreat(int speed) {
+  stop_flag = false;
   //Motor_A
   analogWrite(MotorA_IN1, map(speed, 128, 255, 150, 80));
   digitalWrite(MotorA_IN2, HIGH);
@@ -226,6 +261,12 @@ void retreat(int speed) {
 
 //停止
 void tank_stop() {
+  if (!stop_flag)
+  {
+      mp3.play(3);
+//      mp3.disableLoop();
+      stop_flag = true;
+  }
   //Motor_A
   analogWrite(MotorA_IN1, 0);
   digitalWrite(MotorA_IN2, LOW);
