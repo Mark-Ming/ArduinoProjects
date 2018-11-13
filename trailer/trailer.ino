@@ -203,7 +203,7 @@ void loop() {
 
     if (LX == 128 && LY == 127 && initialAngle != 90)
     {
-      initialAngle < 90 ? (initialAngle += per_Angle) : (initialAngle -= per_Angle);
+      initialAngle < 90 ? (initialAngle += 2 * per_Angle) : (initialAngle -= 2 * per_Angle);
       barrel1.write(initialAngle);
       barrel2.write(initialAngle);
     }
@@ -261,7 +261,7 @@ void retreat(int speed) {
 
 //停止
 void tank_stop() {
-  if (!stop_flag)
+  if (!stop_flag && start_flag)
   {
       mp3.play(3);
 //      mp3.disableLoop();
@@ -331,7 +331,7 @@ void swerve(int x, int y)
 //判断增减性确定方向 (derection 左下方区域使用 0, 右上方区域使用 1)
 bool judgeBottomLeft(int tempValue, int newValue, int derection)
 {
-  if (derection == 0)
+  if (derection == 1)
   {
     return newValue >  tempValue ;
   }
