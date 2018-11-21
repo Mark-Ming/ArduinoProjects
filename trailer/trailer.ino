@@ -25,34 +25,31 @@
 
 PS2X ps2x;
 Servo barrel1; //转向舵机(前)
-Servo barrel2; //转向舵机(前)
+Servo barrel2; //转向舵机(后)
 
 int error = 0;
 byte type = 0;
 byte vibrate = 0;
 int initialAngle = 90; //舵机初始角度
-int max_Angle = 130; //最大角度
-int min_Angle = 60; //最小角度
-int per_Angle = 5 ; //每次角度变化量
+int max_Angle = 130; //转向最大角度
+int min_Angle = 60; //转向最小角度
+int per_Angle = 5 ; //每次舵机角度变化量
 int speed_range[3] = {85, 170, 255}; //三个前进档位速度上限
-int current_speed = 120; // 当前速度《120映射为0》
-int reverse_max_speed = 85; //倒挡最大速度
+int current_speed = 120; // 当前前进速度《120映射为0》 120~0
+int current_back_speed = 140; // 当前后退速度《140映射为0》140~255
 int current_level = 0; //初始档位
+bool trailer_status = 0; //卡车当前状态，0表示停止、1表示前进、2表示后退
+bool start_flag = false; //卡车现在是否已经启动
+bool stop_flag = true; //卡车现在是否已经停止
 static unsigned long last_time = millis(); //上次档位变化的时间
-static unsigned long change_speed_timer = millis();
+static unsigned long change_speed_timer = millis(); //上次速度变化的时间
 
 int temp_x = 127; //记录上一次的x
 int temp_y = 128; //记录上一次的y
 
 //音频相关：
-//MP3播放对象
-DFRobotDFPlayerMini mp3;
-//计算时间间隔变量
-static unsigned long music_timer = 0;
-//判断车现在是否已经启动
-bool start_flag = false;
-//判断车现在是否在停止
-bool stop_flag = true;
+DFRobotDFPlayerMini mp3; //MP3播放对象
+static unsigned long music_timer = 0; //计算时间间隔变量
 
 void setup() {
   Serial.begin(9600);
@@ -62,19 +59,17 @@ void setup() {
   barrel2.attach(23);
   barrel1.write(initialAngle);
   barrel2.write(initialAngle);
-
+  //驱动马达
   pinMode(MotorA_IN1, OUTPUT);
   pinMode(MotorA_IN2, OUTPUT);
   pinMode(MotorB_IN1, OUTPUT);
   pinMode(MotorB_IN2, OUTPUT);
-
   pinMode(MotorC_IN1, OUTPUT);
   pinMode(MotorC_IN2, OUTPUT);
   pinMode(MotorD_IN1, OUTPUT);
   pinMode(MotorD_IN2, OUTPUT);
   error = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble);
-  //  type = ps2x.readType();
-
+  Serial.println(error);
   mp3.begin(Serial1);
   mp3.volume(30);  //设置音量  0 - 30
   mp3.disableLoop(); //取消循环
@@ -118,8 +113,8 @@ void loop() {
     //    Serial.print(",");
     //    Serial.print(ps2x.Analog(PSS_LY), DEC);
     //    Serial.print(",");
-    //    Serial.print(initialAngle);
-    //    Serial.print(",");
+    //    //        Serial.print(initialAngle);
+    //    //        Serial.print(",");
     //    Serial.print(ps2x.Analog(PSS_RY), DEC);
     //    Serial.print(",");
     //    Serial.println(ps2x.Analog(PSS_RX), DEC);
@@ -145,6 +140,7 @@ void loop() {
           mp3.pause();
           start_flag = false; //熄火，设置为false
           stop_flag = true;
+          trailer_status = 0;
         }
         music_timer = millis();
       }
@@ -212,19 +208,19 @@ void loop() {
       barrel1.write(initialAngle);
       barrel2.write(initialAngle);
     }
-
     swerve(LX, LY); // 实时转向
-
-    if (RY > 120 && RY < 135)
+    if (RY > 120 && RY < 140)
     {
-      tank_stop(); //停止
+      tailer_stop(); //停止
     }
     if (RY <= 120)
     {
+      trailer_status = 1;
       advance(RY); //前进
     }
-    else if (RY >= 135)
+    else if (RY >= 140)
     {
+      trailer_status = 2;
       retreat(RY); //后退
     }
   }
@@ -233,45 +229,27 @@ void loop() {
 
 //前进
 void advance(int speed) {
-  Serial.print("上一次速度:");
-  Serial.println(current_speed);
   stop_flag = false;
   if (speed > current_speed) {
     //减速
     if (millis() - change_speed_timer > 200) {
-      current_speed += 3;
-      current_speed = current_speed >= 120 ? 120 : current_speed;
+      current_speed += 5;
+      current_speed = current_speed >= speed ? speed : current_speed;
       Serial.print("减速，当前速度:");
       Serial.println(current_speed);
-      //Motor_A
-      analogWrite(MotorA_IN1, map(current_speed, 120, 0, 0, speed_range[current_level]));
-      digitalWrite(MotorA_IN2, LOW);
-      analogWrite(MotorC_IN1, map(current_speed, 120, 0, 0, speed_range[current_level]));
-      digitalWrite(MotorC_IN2, LOW);
-      //Motor_B
-      digitalWrite(MotorB_IN1, LOW);
-      analogWrite(MotorB_IN2, map(current_speed, 120, 0, 0, speed_range[current_level]));
-      digitalWrite(MotorD_IN1, LOW);
-      analogWrite(MotorD_IN2, map(current_speed, 120, 0, 0, speed_range[current_level]));
+      motorForward(current_speed);
+      change_speed_timer = millis();
     }
   }
   if (speed < current_speed) {
     //加速
     if (millis() - change_speed_timer > 200) {
-      current_speed -= 3;
-      current_speed = current_speed <= 0 ? 0 : current_speed;
+      current_speed -= 5;
+      current_speed = current_speed <= speed ? speed : current_speed;
       Serial.print("加速，当前速度:");
       Serial.println(current_speed);
-      //Motor_A
-      analogWrite(MotorA_IN1, map(current_speed, 120, 0, 0, speed_range[current_level]));
-      digitalWrite(MotorA_IN2, LOW);
-      analogWrite(MotorC_IN1, map(current_speed, 120, 0, 0, speed_range[current_level]));
-      digitalWrite(MotorC_IN2, LOW);
-      //Motor_B
-      digitalWrite(MotorB_IN1, LOW);
-      analogWrite(MotorB_IN2, map(current_speed, 120, 0, 0, speed_range[current_level]));
-      digitalWrite(MotorD_IN1, LOW);
-      analogWrite(MotorD_IN2, map(current_speed, 120, 0, 0, speed_range[current_level]));
+      motorForward(current_speed);
+      change_speed_timer = millis();
     }
   }
 }
@@ -279,41 +257,69 @@ void advance(int speed) {
 //后退
 void retreat(int speed) {
   stop_flag = false;
-  //Motor_A
-  analogWrite(MotorA_IN1, map(speed, 135, 255, 150, 80));
-  digitalWrite(MotorA_IN2, HIGH);
-  analogWrite(MotorC_IN1, map(speed, 135, 255, 150, 80));
-  digitalWrite(MotorC_IN2, HIGH);
-  //Motor_B
-  digitalWrite(MotorB_IN1, HIGH);
-  analogWrite(MotorB_IN2, map(speed, 135, 255, 150, 80));
-  digitalWrite(MotorD_IN1, HIGH);
-  analogWrite(MotorD_IN2, map(speed, 135, 255, 150, 80));
-}
-
-//减速缓慢停止
-void tank_stop() {
-  if (millis() - change_speed_timer > 200 && current_speed != 120)
-  {
-    current_speed += 5;
-    current_speed = current_speed >= 120 ? 120 : current_speed;
-    //Motor_A
-    analogWrite(MotorA_IN1, map(current_speed, 120, 0, 0, speed_range[current_level]));
-    digitalWrite(MotorA_IN2, LOW);
-    analogWrite(MotorC_IN1, map(current_speed, 120, 0, 0, speed_range[current_level]));
-    digitalWrite(MotorC_IN2, LOW);
-    //Motor_B
-    digitalWrite(MotorB_IN1, LOW);
-    analogWrite(MotorB_IN2, map(current_speed, 120, 0, 0, speed_range[current_level]));
-    digitalWrite(MotorD_IN1, LOW);
-    analogWrite(MotorD_IN2, map(current_speed, 120, 0, 0, speed_range[current_level]));
-    if (!stop_flag && start_flag && current_speed == 120)
-    {
-      mp3.play(3);
-      stop_flag = true;
+  trailer_status = 2;
+  Serial.print("status:");
+  Serial.println(trailer_status);
+  if (speed > current_back_speed) {
+    //加速
+    if (millis() - change_speed_timer > 200) {
+      current_back_speed += 5;
+      current_back_speed = current_back_speed >= speed ? speed : current_back_speed;
+      Serial.print("加速后退，当前速度:");
+      Serial.println(current_back_speed);
+      motorBackwards(current_back_speed);
+      change_speed_timer = millis();
     }
   }
 
+  if (speed < current_back_speed) {
+    //减速
+    if (millis() - change_speed_timer > 200) {
+      current_back_speed -= 5;
+      current_back_speed = current_back_speed <= speed ? speed : current_back_speed;
+      Serial.print("减速后退，当前速度:");
+      Serial.println(current_back_speed);
+      motorBackwards(current_back_speed);
+      change_speed_timer = millis();
+    }
+  }
+
+}
+
+//减速缓慢停止
+void tailer_stop() {
+  Serial.println(trailer_status);
+  if (millis() - change_speed_timer > 200)
+  {
+    change_speed_timer = millis();
+    //前进变为停止
+    if (trailer_status == 1 && current_speed != 120)
+    {
+      current_speed += 5;
+      current_speed = current_speed >= 120 ? 120 : current_speed;
+      motorForward(current_speed);
+      if (!stop_flag && start_flag && current_speed == 120)
+      {
+        mp3.play(3);
+        stop_flag = true;
+        trailer_status = 0;
+      }
+    }
+    //后退变为停止
+    if (trailer_status == 2 && current_back_speed != 140)
+    {
+      Serial.print("减速停止中");
+      current_back_speed -= 5;
+      current_back_speed = current_back_speed <= 140 ? 140 : current_back_speed;
+      motorBackwards(current_back_speed);
+      if (!stop_flag && start_flag && current_back_speed == 140)
+      {
+        mp3.play(3);
+        stop_flag = true;
+        trailer_status = 0;
+      }
+    }
+  }
 }
 
 //急停
@@ -323,31 +329,10 @@ void brakes()
   {
     mp3.play(3);
     stop_flag = true;
+    trailer_status = 0;
   }
   current_speed = 120;
-  //Motor_A
-  analogWrite(MotorA_IN1, map(current_speed, 120, 0, 0, speed_range[current_level]));
-  digitalWrite(MotorA_IN2, LOW);
-  analogWrite(MotorC_IN1, map(current_speed, 120, 0, 0, speed_range[current_level]));
-  digitalWrite(MotorC_IN2, LOW);
-  //Motor_B
-  digitalWrite(MotorB_IN1, LOW);
-  analogWrite(MotorB_IN2, map(current_speed, 120, 0, 0, speed_range[current_level]));
-  digitalWrite(MotorD_IN1, LOW);
-  analogWrite(MotorD_IN2, map(current_speed, 120, 0, 0, speed_range[current_level]));
-
-  //  //Motor_A
-  //  analogWrite(MotorA_IN1, 0);
-  //  digitalWrite(MotorA_IN2, LOW);
-  //  //Motor_C
-  //  analogWrite(MotorC_IN1, 0);
-  //  digitalWrite(MotorC_IN2, LOW);
-  //  //Motor_B
-  //  digitalWrite(MotorB_IN1, LOW);
-  //  analogWrite(MotorB_IN2, 0);
-  //  //Motor_D
-  //  digitalWrite(MotorD_IN1, LOW);
-  //  analogWrite(MotorD_IN2, 0);
+  motorForward(current_speed);
 }
 
 //计算转向
@@ -408,4 +393,54 @@ bool judgeBottomLeft(int tempValue, int newValue, int derection)
   {
     return !(newValue >  tempValue);
   }
+}
+
+//马达前转方法(ABCD四个)
+void motorForward(int cur_front_speed)
+{
+  if (cur_front_speed >= 120)
+  {
+     cur_front_speed = 120;
+     current_speed = 120;
+  }
+  if (cur_front_speed <= 120)
+  {
+     cur_front_speed = 0;
+     current_speed = 0;
+  }
+  //Motor_A_C
+  analogWrite(MotorA_IN1, map(cur_front_speed, 120, 0, 0, speed_range[current_level]));
+  digitalWrite(MotorA_IN2, LOW);
+  analogWrite(MotorC_IN1, map(cur_front_speed, 120, 0, 0, speed_range[current_level]));
+  digitalWrite(MotorC_IN2, LOW);
+  //Motor_B_D
+  digitalWrite(MotorB_IN1, LOW);
+  analogWrite(MotorB_IN2, map(cur_front_speed, 120, 0, 0, speed_range[current_level]));
+  digitalWrite(MotorD_IN1, LOW);
+  analogWrite(MotorD_IN2, map(cur_front_speed, 120, 0, 0, speed_range[current_level]));
+}
+
+//马达后转方法(ABCD四个)
+void motorBackwards(int cur_back_speed)
+{
+  if (cur_back_speed <= 140)
+  {
+     cur_back_speed = 140;
+     current_back_speed = 140;
+  }
+  if (cur_back_speed >= 255)
+  {
+     cur_back_speed = 255;
+     current_back_speed = 255;
+  }
+  //Motor_A
+  analogWrite(MotorA_IN1, map(cur_back_speed, 140, 255, 0, 255));
+  digitalWrite(MotorA_IN2, HIGH);
+  analogWrite(MotorC_IN1, map(cur_back_speed, 140, 255, 0, 255));
+  digitalWrite(MotorC_IN2, HIGH);
+  //Motor_B
+  digitalWrite(MotorB_IN1, HIGH);
+  analogWrite(MotorB_IN2, map(cur_back_speed, 140, 255, 0, 255));
+  digitalWrite(MotorD_IN1, HIGH);
+  analogWrite(MotorD_IN2, map(cur_back_speed, 140, 255, 0, 255));
 }
