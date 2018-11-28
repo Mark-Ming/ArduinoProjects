@@ -45,17 +45,20 @@ void loop() {
 
   LX = analogRead(A0);   // 转向遥杆x轴
   LY = analogRead(A1);   // 转向遥杆y轴
-  RY = analogRead(A14);  // 前进遥杆y轴
+  RY = analogRead(A2);  // 前进遥杆y轴
 
   x_direction = judgeDirection(LX);
   y_direction = judgeDirection(LY);
   r_y_direction = judgeDirection(RY);
-//
-//  Serial.print("LX: ");
-//  Serial.print(LX);
-//
-//  Serial.print("LY: ");
-//  Serial.println(LY);
+
+  Serial.print("LX: ");
+  Serial.print(getRockerValue(LX));
+
+  Serial.print("LY: ");
+  Serial.print(getRockerValue(LY));
+
+  Serial.print("RY: ");
+  Serial.println(getRockerValue(RY));
 
   switch (x_direction) {
     case -1: key = ROCKER_LEFT; break;
@@ -104,7 +107,7 @@ void loop() {
 
   //发送数据
   Serial1.write(arr, 4);
-  delay(50);
+  delay(40);
 }
 
 //整理遥杆数值

@@ -19,24 +19,25 @@ int min_forward_value = 120;          //对应前进时最小速度(遥杆值)
 int max_forward_value = 0;            //对应前进时最大速度(遥杆值)
 int min_back_value = 150;             //对应后退时最小速度(遥杆值)
 int max_back_value = 255;             //对应后退时最大速度(遥杆值)
-int speed_range[3] = {120, 170, 255};  //三个前进档各自速度上限(遥杆值)
+int speed_range[3] = {120, 170, 255}; //三个前进档各自速度上限(遥杆值)
 int back_speed_limit = 255;           //倒车最大速度[0-255]
 int current_level = 0;                //档位 [初始为一档]
 int current_speed = 120;              //前进速度(遥杆值) [120映射为0] => [120 ~ 0]
+int speed_add_count = 0;               //加减速变化当前值(对应 [x*(x-1)/2 - 1] 函数)
 int current_back_speed = 140;         //后退速度(遥杆值) [140映射为0] => [140 ~ 255]
-int per_speed = 5;                    //每次加速、减速的变化量
+int per_speed = 15;                    //每次加速、减速的变化量
 int current_status = 0;               //卡车当前状态  0:停止 1:前进 -1:后退
 static unsigned long last_speed_timer = millis(); //上次速度变化的时间
 static unsigned long last_level_timer = millis(); //上次档位变化的时间
 
 /* 舵机相关设置 */
-Servo barrel1;          //转向舵机(前)
-Servo barrel2;          //舵机(后斗)
-int initialAngle = 90;  //转向舵机初始角度
-int back_initialAngle = 180; //后斗舵机初始角度
+Servo barrel1;                    //转向舵机(前)
+Servo barrel2;                    //舵机(后斗)
+int initialAngle = 90;            //转向舵机初始角度
+int back_initialAngle = 180;      //后斗舵机初始角度
 bool current_back_status = false; //当前后斗的状态，默认降下
 int max_Angle = 120;    //转向最大角度
-int min_Angle = 50;     //转向最小角度
+int min_Angle = 40;     //转向最小角度
 int per_Angle = 5;      //每次舵机角度变化量
 int temp_x = 127;       //记录上一次的x
 int temp_y = 127;       //记录上一次的y
@@ -53,81 +54,97 @@ static unsigned long last_back_change_step_timer = millis(); //每次变化时�
 #define ROCKER_ADVANCE 80
 #define ROCKER_RETREAT 96
 
-#define BUTTON 112     // 按钮情况
-#define ADD_LEVEL 1       //加档按钮
-#define MINUS_LEVEL 2     //减档按钮
-#define RISE_FALL 3       //后斗升降命令
+#define BUTTON 112           // 按钮情况
+#define ADD_LEVEL 1          //加档按钮
+#define MINUS_LEVEL 2        //减档按钮
+#define RISE_FALL 3          //后斗升降命令
 
-#define HIGH_FOUR 240  //取出高四位key部分使用  按位与
-#define LOW_FOUR  15   //取出低四位data部分使用  按位与
+#define HIGH_FOUR 240        //取出高四位key部分使用  按位与
+#define LOW_FOUR  15         //取出低四位data部分使用  按位与
 
 int key = 0;
-int key_x = 0;
-int key_y = 0;
-int key_r_y = 0;
-int key_button = 0;
-
 int value = 0;
-int value_x = 0;
-int value_y = 0;
-int value_r_y = 0;
 int value_button = 0;
-
 int LX = 127; //初始值
 int LY = 127; //初始值
 int RY = 127; //初始值
 
-unsigned char arr[4] = {};
+unsigned char arr[4] = {};          // 遥控器信息原始数组
 
 void setup() {
   Serial.begin(9600);
-  Serial1.begin(9600);
+  Serial1.begin(9600);              //遥控器使用
   Serial.begin(115200);
-  barrel1.attach(28);    //前转向
-  barrel2.attach(29);  //后斗
+  barrel1.attach(28);               //前转向舵机
+  barrel2.attach(29);               //后斗舵机
   barrel1.write(initialAngle);
   barrel2.write(back_initialAngle);
 }
 
 void loop() {
+  Serial1.readBytes(arr, 4);       //读取遥控器信息
+  handleData(arr);                 //处理遥控器信息
 
-  //  advance(0);
-  Serial1.readBytes(arr, 4);
-  handleData(arr);
+    Serial.print(arr[0]);
+    Serial.print("    ");
+    Serial.print(arr[1]);
+    Serial.print("    ");
+    Serial.print(arr[2]);
+    Serial.print("    ");
+    Serial.print(arr[3]);
+    Serial.println("    ");
 
-  //  Serial.print(arr[0]);
-  //  Serial.print("    ");
-  //  Serial.print(arr[1]);
-  //  Serial.print("    ");
-  //  Serial.print(arr[2]);
-  //  Serial.print("    ");
-  //  Serial.print(arr[3]);
-  //  Serial.println("    ");
-
-  Serial.print("LX : ");
-  Serial.print(LX);
-  Serial.print("LY : ");
-  Serial.print(LY);
-  Serial.print("RY : ");
-  Serial.print(RY);
-  Serial.print("按钮 : ");
-  Serial.println(value_button);
+//  Serial.print("LX : ");
+//  Serial.print(LX);
+//  Serial.print("LY : ");
+//  Serial.print(LY);
+//  Serial.print("RY : ");
+//  Serial.println(RY);
+//  Serial.print("按钮 : ");
+//  Serial.println(value_button);
 
   if (value_button == RISE_FALL)
   {
-    if (millis() - last_back_change_timer > 2000)
-    {
+//    if (millis() - last_back_change_timer > 2000)
+//    {
+//      last_back_change_timer = millis();
       if (!current_back_status) //升起
       {
-        barrel2.write(120);
+        //back_initialAngle   减1至120
+        while (back_initialAngle > 120)
+        {
+          if (millis() - last_back_change_step_timer > 50)
+          {
+            back_initialAngle -= 1;
+            last_back_change_step_timer = millis();
+            barrel2.write(back_initialAngle);
+//            Serial.print("emmmm");
+//            Serial.println(value_button);
+          }
+        }
         current_back_status = true;
       }
       else //下降
       {
-        barrel2.write(180);
+
+         while (back_initialAngle < 180)
+        {
+          if (millis() - last_back_change_step_timer > 50)
+          {
+            back_initialAngle += 1;
+            last_back_change_step_timer = millis();
+            barrel2.write(back_initialAngle);
+//            Serial.print("emmmm");
+//            Serial.println(value_button);
+          }
+        }
         current_back_status = false;
+//        barrel2.write(back_initialAngle);
+//        Serial.print("ahhhhhh");
+//        Serial.println(value_button);
+//        current_back_status = false;
       }
-    }
+//    }
 
   }
 
@@ -158,7 +175,6 @@ void loop() {
     initialAngle < 90 ? (initialAngle += per_Angle) : (initialAngle -= per_Angle);
     initialAngle = initialAngle == 90 ? 90 : initialAngle;
     barrel1.write(initialAngle);
-    barrel2.write(initialAngle);
   }
 
   swerve(LX, LY);  // 舵机实时跟随遥杆转向
@@ -175,17 +191,18 @@ void loop() {
   {
     retreat(RY);//后退
   }
-  delay(60);
+  delay(40);
 }
 
 //卡车前进函数 ---- 参数 : des_speed 当前遥杆传进来的速度
 void advance(int des_speed)
 {
+  current_status = 1;
   stop_flag = false;
   if (current_speed >= des_speed && (millis() - last_speed_timer > 150))
   {
     last_speed_timer = millis();
-    Serial.print("开始加速:");
+//    Serial.print("开始加速:");
     current_speed -= per_speed;
     current_speed = current_speed <= des_speed ? des_speed : current_speed;
     motorForward(current_speed);
@@ -193,7 +210,7 @@ void advance(int des_speed)
   if (current_speed < des_speed && (millis() - last_speed_timer > 150))
   {
     last_speed_timer = millis();
-    Serial.print("开始减速:");
+//    Serial.print("开始减速:");
     current_speed += per_speed;
     current_speed = current_speed >= des_speed ? des_speed : current_speed;
     motorForward(current_speed);
@@ -203,23 +220,9 @@ void advance(int des_speed)
 //卡车后退函数 ---- 参数 : des_speed 当前遥杆传进来的速度
 void retreat(int des_speed)
 {
+  current_status = -1;
   stop_flag = false;
-  if (current_back_speed < des_speed && (millis() - last_speed_timer > 150))
-  {
-    last_speed_timer = millis();
-    Serial.print("开始加速后退:");
-    current_back_speed += per_speed;
-    current_back_speed = current_back_speed >= des_speed ? des_speed : current_back_speed;
-    motorBackward(current_back_speed);
-  }
-  if (current_back_speed > des_speed && (millis() - last_speed_timer > 150))
-  {
-    last_speed_timer = millis();
-    Serial.print("开始减速后退:");
-    current_back_speed -= per_speed;
-    current_back_speed = current_back_speed <= des_speed ? des_speed : current_back_speed;
-    motorBackward(current_back_speed);
-  }
+  motorBackward(des_speed);
 }
 
 //卡车停止函数(缓慢停止)
@@ -270,26 +273,16 @@ void motorForward(int des_speed)
 {
   des_speed = des_speed >= min_forward_value ? min_forward_value : des_speed;
   des_speed = des_speed <= max_forward_value ? max_forward_value : des_speed;
-  int left_differential = 0; //左转差速
-  int right_differential = 0; //右转差速
-  //  if (initialAngle <= 70)
-  //  {
-  //    left_differential = 15;
-  //  }
-  //  if (initialAngle >= 110)
-  //  {
-  //    right_differential = 15;
-  //  }
   //Motor_A_C
-  analogWrite(MotorA_IN1, map(des_speed - left_differential + right_differential, min_forward_value, max_forward_value, 0, speed_range[current_level]));
+  analogWrite(MotorA_IN1, map(des_speed, min_forward_value, max_forward_value, 0, speed_range[current_level]));
   digitalWrite(MotorA_IN2, LOW);
-  analogWrite(MotorC_IN1, map(des_speed - left_differential + right_differential, min_forward_value, max_forward_value, 0, speed_range[current_level]));
+  analogWrite(MotorC_IN1, map(des_speed, min_forward_value, max_forward_value, 0, speed_range[current_level]));
   digitalWrite(MotorC_IN2, LOW);
   //Motor_B_D
   digitalWrite(MotorB_IN1, LOW);
-  analogWrite(MotorB_IN2, map(des_speed - right_differential + left_differential, min_forward_value, max_forward_value, 0, speed_range[current_level]));
+  analogWrite(MotorB_IN2, map(des_speed, min_forward_value, max_forward_value, 0, speed_range[current_level]));
   digitalWrite(MotorD_IN1, LOW);
-  analogWrite(MotorD_IN2, map(des_speed - right_differential + left_differential, min_forward_value, max_forward_value, 0, speed_range[current_level]));
+  analogWrite(MotorD_IN2, map(des_speed, min_forward_value, max_forward_value, 0, speed_range[current_level]));
 }
 
 //马达后转函数 ---- 参数 : des_speed 目标速度
@@ -331,7 +324,7 @@ void swerve(int x, int y)
     initialAngle = initialAngle >= max_Angle ? max_Angle : initialAngle;
     initialAngle = initialAngle <= min_Angle ? min_Angle : initialAngle;
     barrel1.write(initialAngle);
-    barrel2.write(initialAngle);
+    //    barrel2.write(initialAngle);
   }
 
   if (y == 0 || x == 255)
@@ -351,7 +344,7 @@ void swerve(int x, int y)
     initialAngle = initialAngle >= max_Angle ? max_Angle : initialAngle;
     initialAngle = initialAngle <= min_Angle ? min_Angle : initialAngle;
     barrel1.write(initialAngle);
-    barrel2.write(initialAngle);
+    //    barrel2.write(initialAngle);
   }
   temp_x = x;
   temp_y = y;
@@ -370,12 +363,19 @@ bool judgeBottomLeft(int tempValue, int newValue, int derection)
   }
 }
 
+//增量函数
+int acceleratedSpeed(int x)
+{
+  return x * (x - 1) / 2 - 1;
+}
+
 //处理接受到的数据包
 void handleData(unsigned char *arr)
 {
   LX = 127;
   LY = 127;
   RY = 127;
+  value_button = 0;
   for (int i = 0; i < 4; i++)
   {
     key = arr[i] & HIGH_FOUR;
@@ -389,30 +389,5 @@ void handleData(unsigned char *arr)
       case ROCKER_RETREAT: RY = map(value, 1, 15, 128, 255); break;
       case BUTTON: value_button = value; break;
     }
-    //    key_x = arr[0] & HIGH_FOUR;
-    //    value_x = arr[0] & LOW_FOUR;
-    //    switch (key_x) {
-    //      case ROCKER_LEFT:  LX = map(value_x, 15, 1, 126, 0); break;
-    //      case ROCKER_RIGHT: LX = map(value_x, 1, 15, 128, 255); break;
-    //      case 0: LX = 127; break;
-    //    }
-    //    key_y = arr[1] & HIGH_FOUR;
-    //    value_y = arr[1] & LOW_FOUR;
-    //    switch (key_y) {
-    //      case ROCKER_UP:  LY = map(value_y, 15, 1, 126, 0); break;
-    //      case ROCKER_DOWN: LY = map(value_y, 1, 15, 128, 255); break;
-    //      case 0: LY = 127; break;
-    //    }
-    //    key_r_y = arr[2] & HIGH_FOUR;
-    //    value_r_y = arr[2] & LOW_FOUR;
-    //    switch (key_r_y) {
-    //      case ROCKER_ADVANCE:  RY = map(value_r_y, 15, 1, 126, 0); break;
-    //      case ROCKER_RETREAT: RY = map(value_r_y, 1, 15, 128, 255); break;
-    //      case 0: RY = 127; break;
-    //    }
-
-    //按钮的值
-    //  key_button = arr[3] & HIGH_FOUR;
-    //  value_button = arr[3] & LOW_FOUR;
   }
 }
