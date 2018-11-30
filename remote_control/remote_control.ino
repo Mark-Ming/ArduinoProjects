@@ -25,50 +25,62 @@ void setup() {
   Serial.begin(115200);
   Serial1.begin(9600);
   //设置模式开启
-  //  pinMode(20, OUTPUT);
-  //  digitalWrite(20, LOW);
+  pinMode(20, OUTPUT);
+  analogWrite(20, LOW);
+
+//  Serial1.print("AT+C220\r\n");
+//  Serial1.print("AT+RX\r\n");
+//  String str = Serial1.readString();
+//  Serial.println(str);
 }
 
 void loop() {
+
+//  Serial1.print("AT+C220\r\n");
+  Serial1.print("AT+RX\r\n");
+  String str = Serial1.readString();
+  Serial.println(str);
+
+  
   //  LX = getRockerValue(A0);  // 转向遥杆x轴
   //  LY = getRockerValue(A1);  // 转向遥杆y轴
   //  RY = getRockerValue(A13); // 前进遥杆y轴
 
-  LX = analogRead(A0);   // 转向遥杆x轴
-  LY = analogRead(A1);   // 转向遥杆y轴
-  RY = analogRead(A14);  // 前进遥杆y轴
+  //  LX = analogRead(A0);   // 转向遥杆x轴
+  //  LY = analogRead(A1);   // 转向遥杆y轴
+  //  RY = analogRead(A14);  // 前进遥杆y轴
+  //
+  //  x_direction = judgeDirection(LX);
+  //  y_direction = judgeDirection(LY);
+  //  r_y_direction = judgeDirection(RY);
 
-  x_direction = judgeDirection(LX);
-  y_direction = judgeDirection(LY);
-  r_y_direction = judgeDirection(RY);
-  
-  switch (x_direction) {
-    case -1: key = ROCKER_LEFT; break;
-    case  0: key = 0; break;
-    case  1: key = ROCKER_RIGHT; break;
-  }
+  //  switch (x_direction) {
+  //    case -1: key = ROCKER_LEFT; break;
+  //    case  0: key = 0; break;
+  //    case  1: key = ROCKER_RIGHT; break;
+  //  }
   //将x信息存入arr[0]
-  arr[0] = key | getRockerValue(LX);  // 高四位为key,低四位为value
+  //  arr[0] = key | getRockerValue(LX);  // 高四位为key,低四位为value
 
-  switch (y_direction) {
-    case -1: key = ROCKER_UP; break;
-    case  0: key = 0; break;
-    case  1: key = ROCKER_DOWN; break;
-  }
+  //  switch (y_direction) {
+  //    case -1: key = ROCKER_UP; break;
+  //    case  0: key = 0; break;
+  //    case  1: key = ROCKER_DOWN; break;
+  //  }
   //将y信息存入arr[1]
-  arr[1] = key | getRockerValue(LY);  // 高四位为key,低四位为value
+  //  arr[1] = key | getRockerValue(LY);  // 高四位为key,低四位为value
 
-  switch (r_y_direction) {
-    case -1: key = ROCKER_ADVANCE; break;
-    case  0: key = 0; break;
-    case  1: key = ROCKER_RETREAT; break;
-  }
+  //  switch (r_y_direction) {
+  //    case -1: key = ROCKER_ADVANCE; break;
+  //    case  0: key = 0; break;
+  //    case  1: key = ROCKER_RETREAT; break;
+  //  }
   //将ry信息存入arr[2]
-  arr[2] = key | getRockerValue(RY);  // 高四位为key,低四位为value
-  
+  //  arr[2] = key | getRockerValue(RY);  // 高四位为key,低四位为value
+
   //将按钮信息存入arr[3]   key == button
-  key = BUTTON;
-  arr[3] = key | 1;  // 高四位为key,低四位为value
+  //  key = BUTTON;
+  //  arr[3] = key | 1;  // 高四位为key,低四位为value
 
   //  Serial.print("   LX:");
   //  Serial.print(LX);
@@ -79,7 +91,7 @@ void loop() {
   //  Serial.println(RY);
 
   //发送数据
-  Serial1.write(arr, 4);
+  //  Serial1.write(arr, 4);
   delay(50);
 }
 
