@@ -36,7 +36,7 @@ void setup() {
 
 void loop() {
 
-//  Serial1.print("AT+C220\r\n");
+//  Serial1.print("AT+C230\r\n");
   Serial1.print("AT+RX\r\n");
   String str = Serial1.readString();
   Serial.println(str);

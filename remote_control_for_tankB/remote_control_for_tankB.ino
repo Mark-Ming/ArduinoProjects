@@ -17,11 +17,9 @@
 #define ROTATE_TO_LEFT  4  //坦克炮台左旋转
 #define ROTATE_TO_RIGHT 5  //坦克炮台右旋转
 #define TANK_FIRE       6  //坦克开火
-#define TANK_START      7  //坦克启动(播放声音)
 
 //定义控制按钮
 CBButton fire(2);       //左侧上(red)按钮
-CBButton start(5);       //左侧下(green)按钮
 int rotate_left = 0;    //左侧(blue)按钮   需要响应长按
 int rotate_right = 0;   //右侧(yellow)按钮 需要响应长按
 
@@ -33,8 +31,6 @@ int y_direction = 0;   // 转向遥杆y轴方位  0 静止、-1 上、1 下
 int r_y_direction = 0; // 前进遥杆y轴方位  0 静止、-1 上、1 下
 
 int LX = 0;     //方向遥杆x值
-int LY = 0;     //方向遥杆y值
-int RX = 0;     //前进遥杆x值
 int RY = 0;     //前进遥杆y值
 
 
@@ -49,8 +45,6 @@ void setup() {
 void loop() {
 
   LX = analogRead(A0);   // 转向遥杆x轴
-//  LY = analogRead(A1);   // 转向遥杆y轴
-//  RX = analogRead(A2);  // 前进遥杆y轴
   RY = analogRead(A3);  // 前进遥杆y轴
 
   x_direction = judgeDirection(LX);
@@ -62,13 +56,6 @@ void loop() {
 
   Serial.print("LX: ");
   Serial.print(getRockerValue(LX));
-
-  Serial.print("LY: ");
-  Serial.print(getRockerValue(LY));
-
-  Serial.print("RX: ");
-  Serial.print(getRockerValue(RX));
-
   Serial.print("RY: ");
   Serial.println(getRockerValue(RY));
 
@@ -110,11 +97,6 @@ void loop() {
   {
     Serial.println("点击了开火");
     buttonValue = TANK_FIRE;
-  }
-  if (start.keyDown())
-  {
-    Serial.println("点击了启动");
-    buttonValue = TANK_START;
   }
   if (rotate_right == 0)
   {

@@ -54,25 +54,26 @@ static unsigned long music_timer = 0; //计算时间间隔变量
 void setup() {
   Serial.begin(9600);
   Serial.begin(115200);
-  Serial1.begin(9600);
-  barrel1.attach(22);
-  barrel2.attach(23);
-  barrel1.write(initialAngle);
-  barrel2.write(initialAngle);
+  Serial2.begin(9600);
+//  barrel1.attach(22);
+//  barrel2.attach(23);
+//  barrel1.write(initialAngle);
+//  barrel2.write(initialAngle);
   //驱动马达
-  pinMode(MotorA_IN1, OUTPUT);
-  pinMode(MotorA_IN2, OUTPUT);
-  pinMode(MotorB_IN1, OUTPUT);
-  pinMode(MotorB_IN2, OUTPUT);
-  pinMode(MotorC_IN1, OUTPUT);
-  pinMode(MotorC_IN2, OUTPUT);
-  pinMode(MotorD_IN1, OUTPUT);
-  pinMode(MotorD_IN2, OUTPUT);
-  error = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble);
-  Serial.println(error);
-  mp3.begin(Serial1);
-  mp3.volume(30);  //设置音量  0 - 30
-  mp3.disableLoop(); //取消循环
+//  pinMode(MotorA_IN1, OUTPUT);
+//  pinMode(MotorA_IN2, OUTPUT);
+//  pinMode(MotorB_IN1, OUTPUT);
+//  pinMode(MotorB_IN2, OUTPUT);
+//  pinMode(MotorC_IN1, OUTPUT);
+//  pinMode(MotorC_IN2, OUTPUT);
+//  pinMode(MotorD_IN1, OUTPUT);
+//  pinMode(MotorD_IN2, OUTPUT);
+//  error = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble);
+//  Serial.println(error);
+  mp3.begin(Serial2);
+  mp3.loop(1);
+  mp3.volume(20);  //设置音量  0 - 30
+//  mp3.disableLoop(); //取消循环
 }
 
 void loop() {
