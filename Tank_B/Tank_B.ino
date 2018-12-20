@@ -22,11 +22,11 @@ int turn_right_speed = 0;             //右转速度
 
 
 /* 舵机相关设置 */
-Servo barrel1;                     //炮台舵机
+Servo barrel1;                    //炮台舵机
 int initialAngle = 100;            //炮台舵机初始角度
-int max_Angle = 180;               //转向最大角度
-int min_Angle = 10;                //转向最小角度
-int per_Angle = 2;                 //每次舵机角度变化量
+int max_Angle = 180;    //转向最大角度
+int min_Angle = 0;     //转向最小角度
+int per_Angle = 1;      //每次舵机角度变化量
 static unsigned long last_back_change_timer = millis();      //上次升降状态变化的时间
 static unsigned long last_back_change_step_timer = millis(); //每次变化时间间隔
 
@@ -46,6 +46,7 @@ static unsigned long last_back_change_step_timer = millis(); //每次变化时�
 #define ROTATE_TO_LEFT  4  //坦克炮台左旋转
 #define ROTATE_TO_RIGHT 5  //坦克炮台右旋转
 #define TANK_FIRE       6  //坦克开火
+#define TANK_START      7  //坦克启动(播放声音)
 
 #define HIGH_FOUR 240        //取出高四位key部分使用  按位与
 #define LOW_FOUR  15         //取出低四位data部分使用  按位与
@@ -60,7 +61,13 @@ int RY = 127; //右摇杆y初始值   控制前进后退
 unsigned char arr[4] = {};     // 遥控器信息原始数组
 
 /*音频相关*/
+static unsigned long music_timer = millis(); //每次变化时间间隔
+bool clicked_fire_flag = false; //记录是否点击了开火
+bool clicked_start_flag = false; //记录是否点击了启动
 
+/*红外信号相关*/
+bool attacked_flag = false; //记录是否被击中
+static unsigned long  attacked_timer = millis(); //被击中坦克抖动的时间
 
 void setup() {
   Serial.begin(9600);
@@ -69,10 +76,15 @@ void setup() {
   Serial.begin(115200);
   barrel1.attach(22);               //炮台舵机
   barrel1.write(initialAngle);
+  volume(0x14);       //音量设置0x00-0x1E
 
-  volume(0x05); //音量设置0x00-0x1E
+  pinMode(20, INPUT_PULLUP);
+  pinMode(21, INPUT_PULLUP);
 
-  //  play(0x01);   //播放第一首
+  pinMode(3, OUTPUT);
+
+  attachInterrupt(digitalPinToInterrupt(20), attackedAtLeft, FALLING);
+  attachInterrupt(digitalPinToInterrupt(21), attackedAtRight, FALLING);
 
   //设置模式开启
   //  pinMode(20, OUTPUT);
@@ -80,37 +92,64 @@ void setup() {
 }
 
 void loop() {
-  //  if (millis() - music_timer > 5000)
-  //  {
-  //    music_timer = millis();
-  //  }
-
-  //    Serial1.print("AT+RX\r\n");
-  //    String str = Serial1.readString();
-  //    Serial.println(str);
-
   Serial1.readBytes(arr, 4);       //读取遥控器信息
   handleData(arr);                 //处理遥控器信息
 
-  Serial.print(" arr[0] :");
-  Serial.print(arr[0]);
-  Serial.print(" arr[1] :");
-  Serial.print(arr[1]);
-  Serial.print(" arr[2] :");
-  Serial.print(arr[2]);
-  Serial.print(" arr[3] :");
-  Serial.println(arr[3]);
-
-  //  Serial.print("LX : ");
-  //  Serial.print(LX);
-  //  Serial.print("RY : ");
-  //  Serial.println(RY);
-  //  Serial.print("按钮 : ");
-  //  Serial.println(value_button);
+  Serial.print("LX : ");
+  Serial.print(LX);
+  Serial.print("RY : ");
+  Serial.print(RY);
+  Serial.print("按钮 : ");
+  Serial.println(value_button);
 
   if (value_button == TANK_FIRE)
   {
     Serial.println("开火");
+    clicked_fire_flag = true;
+    music_timer = millis();
+    fire();
+    recoil();  // 后坐力
+    volume(0x1E);
+    play(0x02);
+  }
+
+  //开火声音播放完毕回复播放带速声音
+  if (clicked_fire_flag == true && start_flag == true)
+  {
+    if (millis() - music_timer >= 5000 )
+    {
+      clicked_fire_flag = false;
+      operationing();
+    }
+  }
+
+  //开火声音播放完毕回复播放带速声音
+  if (clicked_start_flag == true)
+  {
+    if (millis() - music_timer >= 11000)
+    {
+      clicked_start_flag = false;
+      operationing();
+    }
+  }
+
+  if (value_button == TANK_START)
+  {
+    if (!start_flag)
+    {
+      start_flag = true;   //启动带速声音
+      clicked_start_flag = true;
+      volume(0x14);
+      play(0x03);
+      music_timer = millis();
+    }
+    else
+    {
+      start_flag = false;  //关闭带速声音
+      clicked_start_flag = false;
+      clicked_fire_flag = false;
+      stopMusic();
+    }
   }
 
   if (value_button == ROTATE_TO_LEFT)
@@ -231,6 +270,62 @@ void handleData(unsigned char *arr)
   }
 }
 
+//开火
+void fire()
+{
+  digitalWrite(3, HIGH);
+  delay(600);
+  digitalWrite(3, LOW);
+}
+
+//后坐力
+void recoil()
+{
+  motorBackward(max_back_value);
+  delay(80);
+  motorForward(max_forward_value);
+  delay(80);
+}
+
+//左侧被击中的反应
+void attackedAtLeft()
+{
+  Serial.println("左侧被击中");
+  initialAngle = 80;
+  barrel1.write(initialAngle);
+  for (int i = 0; i < 2000; i++)
+  {
+    //    //Motor_A
+    analogWrite(MotorA_IN1, map(max_forward_value, min_forward_value, max_forward_value, 0, speed_range[current_level]));
+    digitalWrite(MotorA_IN2, LOW);
+
+    //    //Motor_B
+    analogWrite(MotorB_IN1, map(max_forward_value, min_forward_value, max_forward_value, 0, speed_range[current_level]));
+    digitalWrite(MotorB_IN2, LOW);
+  }
+}
+
+//右侧被击中的反应
+void attackedAtRight()
+{
+  Serial.println("右侧被击中");
+  initialAngle = 120;
+  barrel1.write(initialAngle);
+  for (int i = 0; i < 2000; i++)
+  {
+
+    //    //Motor_A
+    digitalWrite(MotorA_IN1, LOW);
+    analogWrite(MotorA_IN2, map(max_forward_value, min_forward_value, max_forward_value, 0, speed_range[current_level]));
+
+    //    //Motor_B
+    digitalWrite(MotorB_IN1, LOW);
+    analogWrite(MotorB_IN2, map(max_forward_value, min_forward_value, max_forward_value, 0, speed_range[current_level]));
+
+  }
+}
+
+/*音频相关*/
 void play(unsigned char Track)
 {
   unsigned char play[6] = {0xAA, 0x07, 0x02, 0x00, Track, Track + 0xB3}; //0xB3=0xAA+0x07+0x02+0x00,即最后一位为校验和
@@ -240,4 +335,17 @@ void volume( unsigned char vol)
 {
   unsigned char volume[5] = {0xAA, 0x13, 0x01, vol, vol + 0xBE}; //0xBE=0xAA+0x13+0x01,即最后一位为校验和
   Serial2.write(volume, 5);
+}
+void stopMusic()
+{
+  unsigned char play[4] = {0xAA, 0x04, 0x00, 0xAE};
+  Serial2.write(play, 4);
+}
+void operationing()  //播放坦克带速声音、复读
+{
+  volume(0x14);
+  play(0x01);
+  //复读指令
+  unsigned char playLoop[8] = {0xAA, 0x20, 0x04, 0x00, 0x00, 0x00, 0x02, 0xAA + 0x20 + 0x04 + 0x02};
+  Serial2.write(playLoop, 8);
 }

@@ -1,6 +1,4 @@
 #include <Servo.h>
-#include <CBMusic.h>
-
 
 //后马达 A(右) / B(左)
 #define MotorA_IN1 7
@@ -25,7 +23,7 @@ int turn_right_speed = 0;             //右转速度
 
 /* 舵机相关设置 */
 Servo barrel1;                    //炮台舵机
-int initialAngle = 100;            //炮台舵机初始角度
+int initialAngle = 90;            //炮台舵机初始角度
 int max_Angle = 180;    //转向最大角度
 int min_Angle = 0;     //转向最小角度
 int per_Angle = 1;      //每次舵机角度变化量
@@ -82,6 +80,8 @@ void setup() {
   pinMode(20, INPUT_PULLUP);
   pinMode(21, INPUT_PULLUP);
 
+  pinMode(3, OUTPUT);
+
   attachInterrupt(digitalPinToInterrupt(20), attackedAtLeft, FALLING);
   attachInterrupt(digitalPinToInterrupt(21), attackedAtRight, FALLING);
 
@@ -109,6 +109,7 @@ void loop() {
     Serial.println("开火");
     clicked_fire_flag = true;
     music_timer = millis();
+    fire();
     recoil();  // 后坐力
     volume(0x1E);
     play(0x02);
@@ -269,6 +270,15 @@ void handleData(unsigned char *arr)
       case BUTTON: value_button = value; break;
     }
   }
+}
+
+
+//开火
+void fire()
+{
+  digitalWrite(3, HIGH);
+  delay(600);
+  digitalWrite(3, LOW);
 }
 
 //后坐力

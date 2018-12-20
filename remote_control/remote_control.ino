@@ -23,7 +23,7 @@ int RY = 0;     //前进遥杆y值
 
 void setup() {
   Serial.begin(115200);
-  Serial1.begin(9600);
+  Serial3.begin(9600);
   //设置模式开启
   pinMode(20, OUTPUT);
   analogWrite(20, LOW);
@@ -36,9 +36,9 @@ void setup() {
 
 void loop() {
 
-//  Serial1.print("AT+C230\r\n");
-  Serial1.print("AT+RX\r\n");
-  String str = Serial1.readString();
+  Serial3.print("AT+C240\r\n");
+//  Serial3.print("AT+RX\r\n");
+  String str = Serial3.readString();
   Serial.println(str);
 
   

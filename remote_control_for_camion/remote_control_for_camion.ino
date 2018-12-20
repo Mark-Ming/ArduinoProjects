@@ -1,12 +1,12 @@
 #include <CBButton.h>
 
-/* 左侧遥杆 */
+/* 左下侧遥杆（转向） */
 #define ROCKER_LEFT  16   //x向左
 #define ROCKER_RIGHT 32   //x向右
 #define ROCKER_UP    48   //y向上
 #define ROCKER_DOWN  64   //y向下
 
-/* 右侧遥杆 */
+/* 右下侧遥杆（前进后退） */
 #define ROCKER_ADVANCE 80 //y向上
 #define ROCKER_RETREAT 96 //y向下
 
@@ -17,9 +17,18 @@
 #define RISE_FALL 3       //后斗升降命令
 
 //定义控制按钮
-CBButton riseFall(9); //右侧左(blue)按钮
-CBButton add(8); //右侧上(red)按钮
-CBButton minus(10); //右侧下(green)按钮
+CBButton btn2(2);
+CBButton btn3(3);
+CBButton btn4(4);
+CBButton btn5(5);
+CBButton btn6(6);
+CBButton btn7(7);
+CBButton btn8(8);
+CBButton btn9(9);
+CBButton btn10(10);
+CBButton btn11(11);
+CBButton btn12(12);
+CBButton btn13(13);
 
 
 unsigned char arr[4] = {};
@@ -33,6 +42,11 @@ int LX = 0;     //方向遥杆x值
 int LY = 0;     //方向遥杆y值
 int RY = 0;     //前进遥杆y值
 
+int TLX = 0;    //左上方遥杆x值
+int TLY = 0;    //左上方遥杆y值
+int TRX = 0;    //右上方遥杆x值
+int TRY = 0;    //右上方遥杆y值
+
 void setup() {
   Serial.begin(115200);
   Serial1.begin(9600);
@@ -45,7 +59,11 @@ void loop() {
 
   LX = analogRead(A0);   // 转向遥杆x轴
   LY = analogRead(A1);   // 转向遥杆y轴
-  RY = analogRead(A2);  // 前进遥杆y轴
+  RY = analogRead(A3);  // 前进遥杆y轴
+  TLX = analogRead(A4);
+  TLY = analogRead(A5);
+  TRX = analogRead(A6);
+  TRY = analogRead(A7);
 
   x_direction = judgeDirection(LX);
   y_direction = judgeDirection(LY);
@@ -56,6 +74,18 @@ void loop() {
 
   Serial.print("LY: ");
   Serial.print(getRockerValue(LY));
+
+  Serial.print("TLX: ");
+  Serial.print(getRockerValue(TLX));
+
+  Serial.print("TLY: ");
+  Serial.print(getRockerValue(TLY));
+
+  Serial.print("TRX: ");
+  Serial.print(getRockerValue(TRX));
+
+  Serial.print("TRY: ");
+  Serial.print(getRockerValue(TRY));
 
   Serial.print("RY: ");
   Serial.println(getRockerValue(RY));
@@ -88,25 +118,71 @@ void loop() {
   //将按钮信息存入arr[3]   key 统一为 button
   key = BUTTON;
   buttonValue = 0; //每次重新设置为0
-  if (add.keyDown())
+  if (btn2.keyDown())
   {
-    Serial.println("点击了加档");
+    Serial.println("点击了2");
     buttonValue = 1;
   }
-  if (minus.keyDown())
+  if (btn3.keyDown())
   {
-    Serial.println("点击了减档");
+    Serial.println("点击了3");
     buttonValue = 2;
   }
-  if (riseFall.keyDown())
+  if (btn4.keyDown())
   {
-    Serial.println("点击了升起");
+    Serial.println("点击了4");
+    buttonValue = 3;
+  }
+  if (btn5.keyDown())
+  {
+    Serial.println("点击了5");
+    buttonValue = 3;
+  }
+  if (btn6.keyDown())
+  {
+    Serial.println("点击了6");
+    buttonValue = 3;
+  }
+  if (btn7.keyDown())
+  {
+    Serial.println("点击了7");
+    buttonValue = 3;
+  }
+  if (btn8.keyDown())
+  {
+    Serial.println("点击了8");
+    buttonValue = 3;
+  }
+  if (btn9.keyDown())
+  {
+    Serial.println("点击了9");
+    buttonValue = 3;
+  }
+
+  if (btn10.keyDown())
+  {
+    Serial.println("点击了10");
+    buttonValue = 3;
+  }
+  if (btn11.keyDown())
+  {
+    Serial.println("点击了11");
+    buttonValue = 3;
+  }
+  if (btn12.keyDown())
+  {
+    Serial.println("点击了12");
+    buttonValue = 3;
+  }
+  if (btn13.keyDown())
+  {
+    Serial.println("点击了13");
     buttonValue = 3;
   }
   arr[3] = key | buttonValue;  // 高四位为key,低四位为value
 
   //发送数据
-  Serial1.write(arr, 4);
+  //  Serial1.write(arr, 4);
   delay(40);
 }
 
